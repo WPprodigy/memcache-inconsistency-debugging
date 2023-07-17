@@ -5,13 +5,15 @@ define( 'LONG_KEY', 'long' );
 define( 'CANARY_KEY', 'canary' );
 define( 'CANARY_VALUE', 'canary' );
 
+// NOTE: needs shared connections / persistency enabled to replicate.
 $memcache = new Memcache();
-$memcache->addServer( 'memcached', 11211, true, 1, 1, 15, true );
+$persistent = 1;
+$memcache->addServer( 'memcached', 11211, true, $persistent, 1, 15, true );
 $memcache->setCompressThreshold( 20000, 0.2 );
 
-// Run a request with ?set_values to setup things.
-if ( isset( $_GET['set_values'] ) ) {
-	echo( "Setting Values\n" );
+// Run a request with ?set_keys to setup things.
+if ( isset( $_GET['set_keys'] ) ) {
+	trigger_error( 'Setting up key caches', E_USER_NOTICE );
 
 	// This doesn't have to be huge to replicate the problem - could be normal size, it just makes it quicker to cause the oom.
 	$memcache->set( LONG_KEY, 'longvalue_' . bin2hex( random_bytes( 5 * 1024 ) ), 0, 2592000 );
@@ -20,18 +22,11 @@ if ( isset( $_GET['set_values'] ) ) {
 }
 
 $canary = $memcache->get( CANARY_KEY );
-if ( CANARY_VALUE !== $canary ) {
-	echo( "TRIGGERED\n" );
-	if ( strpos( $canary, 'longvalue_' ) === 0 ) {
-		echo( 'Returned LONG_KEY when CANARY_KEY was requested.' );
-	} elseif ( empty( $canary ) ) {
-		echo( 'Returned empty response.' );
-	}
+if ( CANARY_VALUE !== $canary && ! empty( $canary ) ) {
+	$received_value = strpos( $canary, 'longvalue_' ) === 0 ? ' Received LONG_KEY value.' : " Received value: $canary.";
+	$request_info = isset( $_GET['thread'], $_GET['iteration'] ) ? " Thread: #{$_GET['thread']}. Iteration: #{$_GET['iteration']}." : '';
 
-	http_response_code( 400 );
-	exit();
-} else {
-	echo( "WORKING\n" );
+	trigger_error( "Invalid value returned for canary.$received_value$request_info", E_USER_WARNING );
 }
 
 // Trigger an OOM by reading the same big memcached value over and over
