@@ -1,6 +1,7 @@
 # Replicating Memcache Inconsistency Issue
 
 tl;dr - the wrong value can be returned for a key if the key is requested while the php request ooms and the next web request asks for a different key.
+GH Issue: https://github.com/websupport-sk/pecl-memcache/issues/111
 
 1) Run `docker compose up` to build up the environment.
 2) Visit `http://localhost:8082/index.php?set_keys` to hydrate the keys
